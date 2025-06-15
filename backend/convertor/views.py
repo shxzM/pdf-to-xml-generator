@@ -13,6 +13,7 @@ class PDFtoXMLView(APIView):
 
     def post(self, request, *args, **kwargs):
         file = request.data.get('file')
+        print("Received file:", file)
         if not file:
             return Response({"error": "No file uploaded."}, status=400)
 
@@ -41,8 +42,7 @@ class PDFtoXMLView(APIView):
                     lines[top] = line
 
                 for top in sorted(lines.keys()):
-                    # line_words = lines[top]
-                    # line_text = ' '.join([w['text'] for w in sorted(line_words, key=lambda w: w['x0'])])
+                    
                     line_words = sorted(lines[top], key=lambda w: w['x0'])
                     line_text = ''
                     prev_x1 = None
@@ -63,28 +63,7 @@ class PDFtoXMLView(APIView):
                         line_elem = etree.SubElement(page_elem, "line")
                         line_elem.text = line_text
 
-                # # Extract Text with Heading Detection
-                # words = page.extract_words(use_text_flow=True, keep_blank_chars=False, extra_attrs=["size"])
-                # for word in words:
-                #     font_size = word.get('size', 0)
-                #     text = word.get('text', '').strip()
-
-                #     if not text:
-                #         continue
-
-                #     try:
-                #         font_size = float(font_size)
-                #     except (TypeError, ValueError):
-                #         font_size = 0
-
-                #     # Heuristic: Consider font sizes >12 as headings (adjust as needed)
-                #     if font_size > 12:
-                #         heading_elem = etree.SubElement(page_elem, "heading")
-                #         heading_elem.text = text
-                #     else:
-                #         line_elem = etree.SubElement(page_elem, "line")
-                #         line_elem.text = text
-
+                
         # Generate XML string
         xml_str = etree.tostring(root, pretty_print=True, encoding='unicode')
         return Response({"xml": xml_str})
