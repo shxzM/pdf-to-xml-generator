@@ -32,27 +32,58 @@ class PDFtoXMLView(APIView):
                             cell_elem = etree.SubElement(row_elem, "cell")
                             cell_elem.text = str(cell) if cell else ""
 
-                # Extract Text with Heading Detection
-                words = page.extract_words(use_text_flow=True, keep_blank_chars=False, extra_attrs=["size"])
+                words = page.extract_words(extra_attrs=["size", "top", "x0", "x1"])
+                lines = {}
                 for word in words:
-                    font_size = word.get('size', 0)
-                    text = word.get('text', '').strip()
+                    top = round(word['top'])  # Group words with similar vertical position
+                    line = lines.get(top, [])
+                    line.append(word)
+                    lines[top] = line
 
-                    if not text:
-                        continue
+                for top in sorted(lines.keys()):
+                    # line_words = lines[top]
+                    # line_text = ' '.join([w['text'] for w in sorted(line_words, key=lambda w: w['x0'])])
+                    line_words = sorted(lines[top], key=lambda w: w['x0'])
+                    line_text = ''
+                    prev_x1 = None
 
-                    try:
-                        font_size = float(font_size)
-                    except (TypeError, ValueError):
-                        font_size = 0
-
-                    # Heuristic: Consider font sizes >12 as headings (adjust as needed)
-                    if font_size > 12:
+                    for word in line_words:
+                        if prev_x1 is not None and word['x0'] - prev_x1 > 3:  # threshold to detect space (tune this)
+                            line_text += ' '  # add space between words
+                        line_text += word['text']
+                        prev_x1 = word['x1']
+                    
+                    # Determine if this line is a heading based on average font size
+                    avg_font_size = sum([float(w.get('size', 0)) for w in line_words]) / len(line_words)
+                    
+                    if avg_font_size > 16:  # Example threshold for heading detection
                         heading_elem = etree.SubElement(page_elem, "heading")
-                        heading_elem.text = text
+                        heading_elem.text = line_text
                     else:
                         line_elem = etree.SubElement(page_elem, "line")
-                        line_elem.text = text
+                        line_elem.text = line_text
+
+                # # Extract Text with Heading Detection
+                # words = page.extract_words(use_text_flow=True, keep_blank_chars=False, extra_attrs=["size"])
+                # for word in words:
+                #     font_size = word.get('size', 0)
+                #     text = word.get('text', '').strip()
+
+                #     if not text:
+                #         continue
+
+                #     try:
+                #         font_size = float(font_size)
+                #     except (TypeError, ValueError):
+                #         font_size = 0
+
+                #     # Heuristic: Consider font sizes >12 as headings (adjust as needed)
+                #     if font_size > 12:
+                #         heading_elem = etree.SubElement(page_elem, "heading")
+                #         heading_elem.text = text
+                #     else:
+                #         line_elem = etree.SubElement(page_elem, "line")
+                #         line_elem.text = text
 
         # Generate XML string
         xml_str = etree.tostring(root, pretty_print=True, encoding='unicode')
